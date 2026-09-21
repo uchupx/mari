@@ -19,8 +19,8 @@ FROM oven/bun:alpine AS runner
 WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
+COPY server.ts ./server.ts
 
 EXPOSE 3000
 
-# Bun static file server with SPA fallback
-CMD ["bun", "x", "serve", "dist", "--single", "--port", "3000"]
+CMD ["bun", "run", "server.ts"]
