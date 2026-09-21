@@ -9,6 +9,6 @@ services:
     container_name: manga-reader
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3000:4173"
     environment:
       - SUWAYOMI_SERVER_URL=${SUWAYOMI_SERVER_URL:-}

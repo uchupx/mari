@@ -1,26 +1,31 @@
-# ── Stage 1: Build ────────────────────────────────────────────────────────────
-FROM oven/bun:alpine AS builder
-
+# ── Base: alpine variant = smallest bun image ─────────────────────────────────
+FROM oven/bun:1-alpine AS base
 WORKDIR /app
 
+# ── Deps: install only prod+dev deps needed for build ─────────────────────────
+FROM base AS deps
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install
 
+# ── Build: compile TypeScript + bundle assets ─────────────────────────────────
+FROM base AS build
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-
-ARG SUWAYOMI_SERVER_URL=""
-ENV SUWAYOMI_SERVER_URL=$SUWAYOMI_SERVER_URL
-
 RUN bun run build
 
-# ── Stage 2: Serve ────────────────────────────────────────────────────────────
-FROM oven/bun:alpine AS runner
-
+# ── Runner: only bun binary + static files + tiny serve script ────────────────
+# No node_modules, no vite, no dev tools → very small final image
+FROM oven/bun:1-alpine AS runner
 WORKDIR /app
 
-COPY --from=builder /app/dist ./dist
-COPY server.ts ./server.ts
+COPY --from=build /app/dist ./dist
+COPY server.ts ./
 
-EXPOSE 3000
+# Run as non-root for security / lower attack surface
+RUN addgroup -S app && adduser -S app -G app
+USER app
+
+EXPOSE 4173
+ENV PORT=4173
 
 CMD ["bun", "run", "server.ts"]
