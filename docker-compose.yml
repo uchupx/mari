@@ -1,0 +1,14 @@
+services:
+  manga-reader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SUWAYOMI_SERVER_URL: ${SUWAYOMI_SERVER_URL:-}
+    image: manga-reader:latest
+    container_name: manga-reader
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - SUWAYOMI_SERVER_URL=${SUWAYOMI_SERVER_URL:-}
