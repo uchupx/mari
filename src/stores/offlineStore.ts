@@ -39,13 +39,12 @@ export const useOfflineStore = defineStore('offline', {
       this.error = null;
 
       try {
-        const [mangas, bookmarks] = await Promise.all([
-          dbService.getAllMangas(),
-          dbService.getAllBookmarks(),
-        ]);
+        // const [bookmarks] = await Promise.all([
+        //   dbService.getAllMangas(),
+        //   dbService.getAllBookmarks(),
+        // ]);
 
-        this.offlineMangas = mangas;
-        this.bookmarks = bookmarks;
+        // this.bookmarks = bookmarks;
         this.isInitialized = true;
       } catch (err: any) {
         this.error = err?.message || 'Failed to initialize IndexedDB store';

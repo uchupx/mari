@@ -2,7 +2,6 @@
 import { onMounted, ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useOfflineStore } from '@/stores/offlineStore';
-import { useMangaStore } from '@/stores/mangaStore';
 import { Icon } from '@iconify/vue';
 import { useToast } from '@/composables/useToast';
 import { useHistoryStore } from './stores/historyStore';
@@ -10,7 +9,6 @@ import { useHistoryStore } from './stores/historyStore';
 const toast = useToast();
 const toastList = toast.toasts; // top-level ref → auto-unwrapped in template
 const offlineStore = useOfflineStore();
-const mangaStore = useMangaStore();
 
 const route = useRoute();
 const router = useRouter();

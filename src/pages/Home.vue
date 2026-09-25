@@ -1,14 +1,10 @@
 <script setup lang="ts">
-import { useToast } from '@/composables/useToast';
 import { mangaService } from '@/services';
-import type { MangaDataClass, MangaSearchResult } from '@/types/api';
-import { Icon } from '@iconify/vue';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import type { MangaDataClass} from '@/types/api';
+import { onMounted, ref,  } from 'vue';
+import { useRouter } from 'vue-router';
 
 const router = useRouter();
-const route = useRoute();
-const toast = useToast();
 
 const APIUrl = import.meta.env.SUWAYOMI_SERVER_URL
 

@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { BookmarkEntry, OfflineChapter, OfflineManga, ReadingHistoryEntry } from '@/types/indexeddb';
+import type { BookmarkEntry, OfflineChapter, ReadingHistoryEntry } from '@/types/indexeddb';
 import { MangaDataClass } from '@/types/api';
 
 export const DB_NAME = 'manga-reader-db';
