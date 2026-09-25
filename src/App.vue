@@ -40,11 +40,6 @@ onMounted(async () => {
   await offlineStore.init();
   toast.success('Offline storage initialized');
 
-  // Check server
-  const ok = await mangaStore.checkServerHealth();
-  if (ok) toast.info(`Connected: ${mangaStore.serverVersion}`);
-  else toast.error('Server offline — demo mode');
-
   isAppReady.value = true;
 });
 
@@ -83,8 +78,8 @@ watch(router.currentRoute, (route) => {
     </button>
   </div>
 
-  <div class="w-full bg-base-200">
-    <div class="container mx-auto">
+  <div class="w-full bg-base-200 ">
+    <div class="container mx-auto pb-10">
       <div class="w-full bg-base-200" :class="hideChrome ? 'h-screen' : 'h-[calc(100vh-4rem)]'">
           <router-view />
       </div>
@@ -112,7 +107,7 @@ watch(router.currentRoute, (route) => {
   </div>
 
   <!-- Mobile-only bottom dock (hidden ≥ md) -->
-  <div v-if="!hideChrome" class="dock dock-xs md:hidden">
+  <div v-if="!hideChrome" class="dock dock-xs md:hidden pb-5 h-20">
     <RouterLink to="/" active-class="dock-active">
       <Icon icon="gravity-ui:house-fill" class="size-[1.2em]" />
       <span class="dock-label">Home</span>

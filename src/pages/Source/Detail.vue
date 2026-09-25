@@ -110,12 +110,12 @@ const gotoManga = (id: number) => {
     <span class="loading loading-dots loading-md"></span>
   </div>
 
-  <div class="fixed bottom-14 right-2">
+  <div class="fixed bottom-30 right-2">
     <div tabindex="0" role="button" class="btn bg-purple-600 capitalize rounded-full px-5 flex" @click="open = !open">
         <Icon icon="codex:menu" class="size-[2rem]" />
         {{ tab }}
     </div>
-    <ul v-show="open" class="absolute right-0 bottom-full menu bg-transparent z-50 p-2 mb-2 shadow-sm rounded-box w-fit min-w-28 items-end">
+    <ul v-show="open" class="absolute right-0 bottom-full menu bg-transparent z-50 p-2 mb-2 shadow-sm rounded-box w-fit min-w-28  items-end">
           <li class="btn btn-sm my-1 w-fit p-5 rounded-full bg-primary capitalize text-white flex flex-row items-center gap-2" @click="tab = 'popular'; open = false">
               <Icon icon="bxs:star" class="size-[1rem] p-0 text-white" color="white"/>
               Popular

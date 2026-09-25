@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
-import { ref, onMounted } from 'vue';
-import { mangaService } from '@/services';
+import { ref, onMounted, toRaw } from 'vue';
+import { mangaService, sourceService } from '@/services';
 import { ChapterDataClass, MangaDataClass } from '@/types/api';
 import { formatRelativeTime } from '@/utils/datetime';
 import { Icon } from '@iconify/vue';
+import { useToast } from '@/composables/useToast';
 
+const toast = useToast()
 
 const route = useRoute();
 const router = useRouter();
@@ -15,10 +17,14 @@ const mangaId = route.params.id as string;
 const manga = ref<MangaDataClass>();
 const chapters = ref<ChapterDataClass[]>([]);
 const isLoading = ref(true);
+const isLoadingChapters = ref(false);
+const isOnLibrary = ref(false);
 
-onMounted(() => {
+onMounted(async () => {
   getManga();
   getChapters();
+
+  isOnLibrary.value = await mangaService.isOnLibrary(parseInt(mangaId));
 });
 
 const getChapters = () => {
@@ -47,6 +53,37 @@ const getManga = () => {
       isLoading.value = false;
     });
 };
+
+const addToLibrary = async () => {
+  if (!manga.value) {
+    toast.error('Manga not found')
+    return;
+  }
+  if (!chapters.value.length) {
+    toast.error('Try again after chapters are loaded')
+    return;
+  }
+
+  const data = toRaw(manga.value)
+  const chaptersLength = chapters.value.length;
+
+  const source = await sourceService.getSource(manga.value.sourceId)
+
+  data.source = source;
+  data.chapterCount = chaptersLength;
+
+  await mangaService.addToLibrary(data);
+  isOnLibrary.value = true;
+
+};
+
+const removeFromLibrary = async () => {
+  if (!manga.value) return;
+
+  await mangaService.removeFromLibrary(manga.value.id);
+  isOnLibrary.value = false;
+};
+
 </script>
 <template>
 <div v-if="!isLoading" class="flex flex-col items-center flex-wrap py-2">
@@ -67,12 +104,24 @@ const getManga = () => {
                 </template>
             </div>
 
-            <button
-                class="btn bg-pink-500  w-full"
-            >
-                <Icon icon="tabler:hearts" class="size-[1.2em]" />
-                Add To Library
-            </button>
+            <template v-if="!isOnLibrary">
+                <button
+                    class="btn bg-pink-500  w-full"
+                    @click="addToLibrary"
+                >
+                    <Icon icon="tabler:hearts" class="size-[1.2em]" />
+                    Add To Library
+                </button>
+            </template>
+            <template v-else>
+                <button
+                    class="btn bg-red-500  w-full"
+                    @click="removeFromLibrary"
+                >
+                    <Icon icon="tabler:hearts-off" class="size-[1.2em]" />
+                    Remove From Library
+                </button>
+            </template>
 
             <button
                 class="btn btn-primary w-full"
@@ -84,7 +133,12 @@ const getManga = () => {
             <p class="text-justify">{{ manga!.description }}</p>
         </div>
     </div>
-    <div class="w-full p-4 mb-10" v-show="chapters.length > 0">
+    <template v-if="isLoadingChapters">
+        <div class="flex justify-center py-6">
+            <span class="loading loading-dots loading-md"></span>
+        </div>
+    </template>
+    <div class="w-full p-4 mb-10" v-else-if="chapters.length > 0">
         <ul class="list bg-base-100 rounded-box shadow-md">
           <li class="p-4 pb-2 text-xs opacity-60 tracking-wide">Total chapters: {{ chapters.length > 0 ? chapters[0].chapterNumber : 0}}</li>
 
@@ -110,6 +164,10 @@ const getManga = () => {
             </li>
           </template>
         </ul>
+    </div>
+    <div v-else class="w-full p-4 mb-40 flex flex-col items-center gap-5">
+        <Icon icon="healthicons:not-ok-24px" class="size-[5rem]" />
+        <h3>Chapters not found</h3>
     </div>
 </div>
 <div v-if="isLoading" class="flex justify-center py-6">

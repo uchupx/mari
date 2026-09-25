@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { BookmarkEntry, OfflineChapter, OfflineManga, ReadingHistoryEntry } from '@/types/indexeddb';
+import { MangaDataClass } from '@/types/api';
 
 export const DB_NAME = 'manga-reader-db';
 export const DB_VERSION = 1;
@@ -7,7 +8,7 @@ export const DB_VERSION = 1;
 export interface MangaReaderDB extends DBSchema {
   mangas: {
     key: number;
-    value: OfflineManga;
+    value: MangaDataClass;
     indexes: {
       'by-title': string;
       'by-source': string;
@@ -87,19 +88,20 @@ export function getDb(): Promise<IDBPDatabase<MangaReaderDB>> {
 
 export const dbService = {
   // --- Manga ---
-  async saveManga(manga: OfflineManga): Promise<void> {
+  async saveManga(manga: MangaDataClass): Promise<void> {
     const db = await getDb();
+    console.log(manga);
     await db.put('mangas', manga);
   },
 
-  async getManga(id: number): Promise<OfflineManga | undefined> {
+  async getManga(id: number): Promise<MangaDataClass | undefined> {
     const db = await getDb();
     return db.get('mangas', id);
   },
 
-  async getAllMangas(): Promise<OfflineManga[]> {
+  async getAllMangas(): Promise<MangaDataClass[]> {
     const db = await getDb();
-    return db.getAllFromIndex('mangas', 'by-savedAt');
+    return db.getAllFromIndex('mangas', 'by-title');
   },
 
   async deleteManga(id: number): Promise<void> {

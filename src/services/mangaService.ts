@@ -1,4 +1,5 @@
 import type { ApiClient } from './apiClient';
+import { dbService } from '@/db/indexdb';
 import { defaultApiClient } from './apiClient';
 import type {
   BatchChapterRequest,
@@ -10,7 +11,28 @@ import type {
 } from '@/types/api';
 
 export class MangaService {
-  constructor(private client: ApiClient = defaultApiClient) {}
+  constructor(private client: ApiClient = defaultApiClient, private db: typeof dbService = dbService) {}
+
+  buildEntry(
+    manga: MangaDataClass
+  ): MangaDataClass {
+    return manga
+  }
+
+  public async addToLibrary(manga: MangaDataClass): Promise<void> {
+    const entry = this.buildEntry(manga);
+    await this.db.saveManga(entry);
+  }
+
+
+  public async getLibrary(): Promise<MangaDataClass[]> {
+    return await this.db.getAllMangas();
+  }
+
+  public async isOnLibrary(mangaId: number): Promise<boolean> {
+    const mangas = await this.db.getAllMangas();
+    return mangas.some(manga => manga.id === mangaId);
+  }
 
   /**
    * 4.1. Ambil detail manga
@@ -55,20 +77,9 @@ export class MangaService {
     );
   }
 
-  /**
-   * 4.2. Tambah manga ke Library
-   * GET /api/v1/manga/{mangaId}/library
-   */
-  public async addToLibrary(mangaId: number): Promise<void> {
-    return this.client.get<void>(`/manga/${mangaId}/library`);
-  }
 
-  /**
-   * 4.2. Hapus manga dari Library
-   * DELETE /api/v1/manga/{mangaId}/library
-   */
   public async removeFromLibrary(mangaId: number): Promise<void> {
-    return this.client.delete<void>(`/manga/${mangaId}/library`);
+    return this.db.deleteManga(mangaId);
   }
 
   /**
