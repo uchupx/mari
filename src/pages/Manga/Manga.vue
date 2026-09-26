@@ -34,7 +34,6 @@ const getChapters = () => {
   mangaService.getChapters(id)
     .then((data) => {
       chapters.value = data;
-      console.log(data)
     })
     .finally(() => {
       isLoading.value = false;
