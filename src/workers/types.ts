@@ -1,7 +1,6 @@
 export interface ChapterDownloadPayload {
   mangaId: number;
   chapterId: number;
-  /** Ordered list of fully-resolved page image URLs (built on main thread) */
   pageUrls: string[];
 }
 export interface ChapterDownloadResult {
@@ -12,11 +11,27 @@ export interface ChapterDownloadResult {
   chapterId: number;
 }
 
+
+export interface CheckUpdatePayload {
+  mangaId: number;
+  pageCount: number;
+}
+
+export interface CheckUpdateResult {
+  status: string;
+  error?: string;
+  isUpdateAvailable: boolean;
+}
+
 export interface TaskRegistry {
   chapterDownload: {
     payload: ChapterDownloadPayload;
     result: ChapterDownloadResult;
   };
+  checkUpdate: {
+    payload: CheckUpdatePayload;
+    result: CheckUpdateResult;
+  }
 }
 
 export type TaskName = keyof TaskRegistry;

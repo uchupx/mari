@@ -1,5 +1,6 @@
 import type { WorkerInMessage, WorkerOutMessage, TaskRegistry } from './types';
 import { pageDownloadWorker } from './pageDownloadWorker';
+import { checkUpdateWorker } from './checkUpdateWorker';
 
 self.onmessage = async (e: MessageEvent<WorkerInMessage>) => {
   const { id, action, payload } = e.data;
@@ -11,6 +12,11 @@ self.onmessage = async (e: MessageEvent<WorkerInMessage>) => {
       case 'chapterDownload': {
         const p = payload as TaskRegistry['chapterDownload']['payload'];
         result = await pageDownloadWorker(p);
+        break;
+      }
+      case 'checkUpdate': {
+        const p = payload as TaskRegistry['checkUpdate']['payload'];
+        result = await checkUpdateWorker(p);
         break;
       }
 
