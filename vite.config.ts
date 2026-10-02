@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { fileURLToPath, URL } from 'node:url';
+import pkg from './package.json';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -101,5 +102,8 @@ export default defineConfig({
   server: {
     port: 5173,
     host: '0.0.0.0'
-  }
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
 });
