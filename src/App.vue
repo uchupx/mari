@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue';
+import { onMounted, ref, computed, watch, provide, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useOfflineStore } from '@/stores/offlineStore';
 import { Icon } from '@iconify/vue';
 import { useToast } from '@/composables/useToast';
 import { useHistoryStore } from './stores/historyStore';
+import { WorkerPool } from './workers/pool';
 
 const toast = useToast();
 const toastList = toast.toasts; // top-level ref → auto-unwrapped in template
@@ -15,7 +16,15 @@ const router = useRouter();
 
 const historyStore = useHistoryStore();
 const hideChrome = computed(() => route.meta.hideNavbar === true);
+
+const pool = new WorkerPool(
+  new URL('./workers/taskRegister.ts', import.meta.url),
+  3
+);
+
 historyStore.init();
+provide('workerPool', pool)
+
 const isDark = ref(false);
 const isAppReady = ref(false);
 
@@ -34,7 +43,6 @@ onMounted(async () => {
   isDark.value = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
   applyTheme();
 
-  // Init IndexedDB via Pinia store
   await offlineStore.init();
   toast.success('Offline storage initialized');
 
@@ -43,6 +51,10 @@ onMounted(async () => {
 
 watch(router.currentRoute, (route) => {
   document.title = route.meta.title as string;
+});
+
+onUnmounted(() => {
+  pool.terminate();
 });
 
 </script>

@@ -9,14 +9,19 @@ import type {
   MangaDataClass,
   UpdateChapterPayload,
 } from '@/types/api';
+import { OfflineManga } from '@/types/indexeddb';
 
 export class MangaService {
   constructor(private client: ApiClient = defaultApiClient, private db: typeof dbService = dbService) {}
 
   buildEntry(
     manga: MangaDataClass
-  ): MangaDataClass {
-    return manga
+  ): OfflineManga {
+    return {
+      ...manga,
+      savedAt: Date.now(),
+      hasUpdate: false,
+    };
   }
 
   public async addToLibrary(manga: MangaDataClass): Promise<void> {
@@ -24,8 +29,21 @@ export class MangaService {
     await this.db.saveManga(entry);
   }
 
+  public async updateLastSyncedAt(mangaId: number, lastSyncedAt: number, hasUpdate: boolean): Promise<void> {
+    const manga = await this.db.getManga(mangaId);
+    if (manga) {
+      await this.db.saveManga({ ...manga, lastSyncedAt, hasUpdate });
+    }
+  }
 
-  public async getLibrary(): Promise<MangaDataClass[]> {
+  public async updateHasBeenCheck(mangaId: number): Promise<void> {
+    const manga = await this.db.getManga(mangaId);
+    if (manga) {
+      await this.db.saveManga({ ...manga, hasUpdate: false });
+    }
+  }
+
+  public async getLibrary(): Promise<OfflineManga[]> {
     return await this.db.getAllMangas();
   }
 

@@ -64,6 +64,7 @@ export const useOfflineStore = defineStore('offline', {
           ...manga,
           savedAt: Date.now(),
           lastSyncedAt: Date.now(),
+          hasUpdate: false,
         };
 
         await dbService.saveManga(offlineManga);

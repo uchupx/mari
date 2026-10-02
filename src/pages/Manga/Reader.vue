@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { inject, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { mangaService } from '@/services';
 import { Icon } from '@iconify/vue';
 import type { ChapterDataClass, MangaDataClass } from '@/types/api';
 import { useHistoryStore } from '@/stores/historyStore';
+import { WorkerPool } from '@/workers/pool';
 
 interface PageImage {
   url: string;
@@ -33,6 +34,7 @@ const isLoadingNext = ref(false);
 const currentChapterIndex = ref(-1);
 const currentPageIndex = ref(-1);
 
+const pool = inject<WorkerPool>('workerPool')!;
 
 const mangaId = parseInt(route.params.mangaId as string);
 let currentPage = parseInt(route.params.chapterIndex as string);
@@ -52,7 +54,15 @@ onMounted(() => {
     manga = m;
   });
 
+  mangaService.getChapter(mangaId, currentPage).then((chapter) => {
+    const pageUrls = Array.from({ length: chapter.pageCount }, (_, k) =>
+      mangaService.getPageImageUrl(mangaId, currentPage, k, false)
+    );
+    pool.dispatch('chapterDownload', { mangaId, chapterId: currentPage, pageUrls })
+  });
+
   loadChapterList();
+
 
   observer = new IntersectionObserver(
     (entries) => {

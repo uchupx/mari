@@ -21,36 +21,46 @@ const isLoadingChapters = ref(false);
 const isOnLibrary = ref(false);
 
 onMounted(async () => {
-  getManga();
-  getChapters();
+  getManga().then(() => {
+    const timestampInSeconds: number = Math.floor(Date.now() / 1000);
+    const shouldOnlineFetch = timestampInSeconds - (manga.value?.lastFetchedAt ?? 0) > 60;
+
+    getChapters(shouldOnlineFetch);
+  });
 
   isOnLibrary.value = await mangaService.isOnLibrary(parseInt(mangaId));
 });
 
-const getChapters = () => {
+const getChapters = (shouldOnlineFetch: boolean = false) => {
   isLoading.value = true;
   const id = parseInt(mangaId);
 
-  mangaService.getChapters(id)
+  mangaService.getChapters(id, shouldOnlineFetch)
     .then((data) => {
       chapters.value = data;
-      console.log(data)
     })
     .finally(() => {
       isLoading.value = false;
     });
 };
 
-const getManga = () => {
+const getManga = async () => {
   isLoading.value = true;
   const id = parseInt(mangaId);
 
-  mangaService.getManga(id)
-    .then((data) => {
+  return mangaService.getManga(id)
+    .then(async (data) => {
       manga.value = data;
+
+      isOnLibrary.value = await mangaService.isOnLibrary(id);
+
+      if (isOnLibrary.value) {
+        mangaService.updateHasBeenCheck(id);
+      }
     })
     .finally(() => {
       isLoading.value = false;
+      return;
     });
 };
 

@@ -3,6 +3,7 @@ import type { ChapterDataClass, MangaDataClass } from './api';
 export interface OfflineManga extends MangaDataClass {
   savedAt: number;
   lastSyncedAt?: number;
+  hasUpdate: boolean;
   customNotes?: string;
 }
 
