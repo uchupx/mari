@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/vue" />
 
 interface ImportMetaEnv {
   /** Base URL of Suwayomi-Server, e.g. http://192.168.1.10:4566. Empty = same origin. */
