@@ -4,12 +4,14 @@ import { useRoute, useRouter } from 'vue-router';
 import { useOfflineStore } from '@/stores/offlineStore';
 import { Icon } from '@iconify/vue';
 import { useToast } from '@/composables/useToast';
+import { usePwaUpdate } from '@/composables/usePwaUpdate';
 import { useHistoryStore } from './stores/historyStore';
 import { WorkerPool } from './workers/pool';
 
 const toast = useToast();
 const toastList = toast.toasts; // top-level ref → auto-unwrapped in template
 const offlineStore = useOfflineStore();
+const { needRefresh, update: updateApp, dismiss: dismissUpdate } = usePwaUpdate();
 
 const route = useRoute();
 const router = useRouter();
@@ -113,6 +115,20 @@ onUnmounted(() => {
     >
       <span v-if="t.type === 'loading'" class="loading loading-spinner loading-sm"></span>
       <span>{{ t.message }}</span>
+    </div>
+  </div>
+
+  <div
+    v-if="needRefresh"
+    class="fixed bottom-24 left-4 right-4 md:left-auto md:right-6 md:bottom-6 md:w-96 z-[70] alert alert-info shadow-xl flex flex-col items-center justify-between"
+  >
+    <div class="block w-full">
+      <div class="font-bold text">Update Available</div>
+      <div class="text-xs opacity-80">A new version is ready.</div>
+    </div>
+    <div class="flex gap-2 w-full">
+      <button class="btn btn-ghost w-[calc(50%-6px)]" @click="dismissUpdate">Later</button>
+      <button class="btn btn-primary w-[calc(50%-6px)]" @click="updateApp">Update</button>
     </div>
   </div>
 
