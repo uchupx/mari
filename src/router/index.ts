@@ -20,7 +20,7 @@ const router = createRouter({
       }
     },
     {
-      path: '/source/:id',
+      path: '/source/:id/:type(popular|latest|filter)?',
       name: 'source-detail',
       component: () => import('@/pages/Source/Detail.vue'),
       meta: {

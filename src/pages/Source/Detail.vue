@@ -6,13 +6,20 @@ import { Icon } from '@iconify/vue';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 
+type TabType = 'popular' | 'latest' | 'filter';
+
 const router = useRouter();
 const route = useRoute();
 const toast = useToast();
 
 const APIUrl = import.meta.env.SUWAYOMI_SERVER_URL
 const sourceId = route.params.id as string;
-const tab = ref<'popular' | 'latest' | 'filter'>('popular');
+
+const rawType = route.params.type as string;
+const isValidTab = (val: string): val is TabType => ['popular', 'latest', 'filter'].includes(val);
+const activeType: TabType = isValidTab(rawType) ? rawType : 'popular';
+const tab = ref<TabType>(activeType);
+
 const open = ref(false);
 
 const mangaList = ref<MangaDataClass[]>([]);
@@ -23,14 +30,14 @@ const sentinelEl = ref<HTMLElement | null>(null);
 
 let observer: IntersectionObserver | null = null;
 
-const fetchPage = (t: 'popular' | 'latest' | 'filter', page: number): Promise<MangaSearchResult> | null => {
+const fetchPage = (t: TabType ,page: number): Promise<MangaSearchResult> | null => {
   if (t === 'popular') return sourceService.getPopular(sourceId, page);
   if (t === 'latest') return sourceService.getLatest(sourceId, page);
 
   return null; // filter not implemented yet
 };
 
-const loadTab = async (t: 'popular' | 'latest' | 'filter') => {
+const loadTab = async (t: TabType) => {
   isLoading.value = true;
   mangaList.value = [];
 
@@ -78,6 +85,7 @@ onMounted(async () => {
 });
 
 watch(tab, async (newTab) => {
+  router.replace({ params: { ...route.params, type: newTab } });
   await loadTab(newTab);
 });
 

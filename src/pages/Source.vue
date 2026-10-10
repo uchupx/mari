@@ -18,7 +18,7 @@ onMounted(() => {
 });
 
 const gotoSource = (sourceId: string | number) => {
-  router.push(`/source/${sourceId}`);
+  router.push(`/source/${sourceId}/popular`);
 };
 </script>
 <template>
