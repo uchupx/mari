@@ -2,6 +2,17 @@ import { createRouter, createWebHistory } from 'vue-router';
 
 const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition;
+    }
+
+    if (to.hash) {
+      return { el: to.hash }
+    }
+
+    return { top: 0 }
+  },
   routes: [
     {
       path: '/',
@@ -20,7 +31,7 @@ const router = createRouter({
       }
     },
     {
-      path: '/source/:id',
+      path: '/source/:id/:type(popular|latest|filter)?',
       name: 'source-detail',
       component: () => import('@/pages/Source/Detail.vue'),
       meta: {
