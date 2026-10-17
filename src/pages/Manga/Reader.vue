@@ -63,7 +63,6 @@ onMounted(() => {
 
   loadChapterList();
 
-
   observer = new IntersectionObserver(
     (entries) => {
       if (!entries.some((e) => e.isIntersecting)) return;

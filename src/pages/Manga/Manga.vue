@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
-import { ref, onMounted, toRaw } from 'vue';
+import { ref, computed, onMounted, toRaw } from 'vue';
 import { mangaService, sourceService } from '@/services';
 import { ChapterDataClass, MangaDataClass } from '@/types/api';
 import { formatRelativeTime } from '@/utils/datetime';
 import { Icon } from '@iconify/vue';
 import { useToast } from '@/composables/useToast';
+import { useHistoryStore } from '@/stores/historyStore';
 
 const toast = useToast()
 
 const route = useRoute();
 const router = useRouter();
+const historyStore = useHistoryStore();
 const APIUrl = import.meta.env.SUWAYOMI_SERVER_URL
 
 const mangaId = route.params.id as string;
@@ -20,7 +22,44 @@ const isLoading = ref(true);
 const isLoadingChapters = ref(false);
 const isOnLibrary = ref(false);
 
+const lastReadChapter = computed(() => {
+  return historyStore.continueReading.find((entry) => entry.mangaId === parseInt(mangaId));
+});
+
+const handleResumeOrStart = () => {
+  if (lastReadChapter.value) {
+    router.push({
+      name: 'reader',
+      params: {
+        mangaId: mangaId,
+        chapterIndex: lastReadChapter.value.chapterIndex,
+      },
+    });
+    return;
+  }
+
+  if (!chapters.value.length) {
+    toast.error('Chapters not loaded yet');
+    return;
+  }
+
+  const firstChapter = [...chapters.value].sort((a, b) => a.chapterNumber - b.chapterNumber)[0];
+  if (firstChapter) {
+    router.push({
+      name: 'reader',
+      params: {
+        mangaId: mangaId,
+        chapterIndex: firstChapter.index,
+      },
+    });
+  }
+};
+
 onMounted(async () => {
+  if (!historyStore.isInitialized) {
+    await historyStore.init();
+  }
+
   getManga().then(() => {
     const timestampInSeconds: number = Math.floor(Date.now() / 1000);
     const shouldOnlineFetch = timestampInSeconds - (manga.value?.lastFetchedAt ?? 0) > 60;
@@ -138,6 +177,14 @@ const removeFromLibrary = async () => {
             >
                 <Icon icon="akar-icons:cloud-download" class="size-[1.2em]" />
                 Download
+            </button>
+            <button
+                class="btn btn-primary w-full"
+                :disabled="!lastReadChapter && !chapters.length"
+                @click="handleResumeOrStart"
+            >
+                <Icon icon="bi:caret-right-fill" class="size-[1.2em]" />
+                {{ lastReadChapter ? 'Resume' : 'Start Reading' }}
             </button>
 
             <p class="text-justify">{{ manga!.description }}</p>
