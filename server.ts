@@ -6,17 +6,37 @@ const indexHtml = Bun.file(join(distDir, "index.html"));
 
 Bun.serve({
   port: PORT,
-  hostname: "0.0.0.0",   // ← accessible from outside the container
+  hostname: "0.0.0.0",
   async fetch(req) {
     const pathname = new URL(req.url).pathname;
     const file = Bun.file(join(distDir, pathname));
 
-    // Serve the file if it exists, otherwise SPA fallback → index.html
     if (await file.exists()) {
-      return new Response(file);
+      const isNoCache =
+        pathname === "/sw.js" ||
+        pathname.endsWith(".html") ||
+        pathname.includes("workbox-") ||
+        pathname.endsWith(".webmanifest");
+
+      const headers = new Headers();
+      if (isNoCache) {
+        headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+        headers.set("Pragma", "no-cache");
+        headers.set("Expires", "0");
+      } else if (pathname.startsWith("/assets/")) {
+        headers.set("Cache-Control", "public, max-age=31536000, immutable");
+      }
+
+      return new Response(file, { headers });
     }
 
-    return new Response(indexHtml);
+    return new Response(indexHtml, {
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+      },
+    });
   },
 });
 
