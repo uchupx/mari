@@ -4,14 +4,27 @@ import { useHistoryStore } from '@/stores/historyStore';
 import { storeToRefs } from 'pinia';
 import { useRouter } from 'vue-router';
 import { Icon } from '@iconify/vue';
+import type { ReadingHistoryEntry } from '@/types/indexeddb';
 
 const router = useRouter();
 const API_URL = import.meta.env.SUWAYOMI_SERVER_URL;
 const historyStore = useHistoryStore();
 const { history } = storeToRefs(historyStore);
 
+const resumeReading = (item: ReadingHistoryEntry) => {
+  router.push({
+    name: 'reader',
+    params: {
+      mangaId: item.mangaId,
+      chapterIndex: item.chapterIndex,
+    },
+  });
+};
+
 onMounted(async () => {
-  console.log(history.value)
+  if (!historyStore.isInitialized) {
+    await historyStore.init();
+  }
 });
 </script>
 
@@ -37,7 +50,7 @@ onMounted(async () => {
 
             <button
               class="btn bg-purple-500 rounded-full btn-sm"
-              @click.stop
+              @click.stop="resumeReading(item)"
             >
                 Resume
                 <Icon icon="bi:caret-right-fill" class="text-white size-4"/>

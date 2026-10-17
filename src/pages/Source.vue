@@ -13,7 +13,6 @@ const APIUrl = import.meta.env.SUWAYOMI_SERVER_URL
 onMounted(() => {
   sourceService.getSources().then((sourcesData) => {
     sources.value = sourcesData;
-    console.log(sourcesData);
   });
 });
 
