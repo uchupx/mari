@@ -1,4 +1,7 @@
 <script setup lang="ts">
+defineOptions({
+  name: 'Reader',
+});
 import { inject, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { mangaService } from '@/services';
@@ -170,7 +173,7 @@ const onScroll = async () => {
   <!-- <div class="min-h-screen bg-base-300 pb-10">
     <div class="navbar sticky top-0 z-40 bg-base-100 shadow-md">
       <button class="btn btn-ghost btn-circle" aria-label="Back" @click="router.back()">
-        <Icon icon="tabler:arrow-left" class="size-[1.4em]" />
+        <Icon icon="tabler:arrow-left" class="size-[1.4em]"/>
       </button>
       <div class="min-w-0 flex-1 px-2">
         <div class="truncate text-sm font-semibold">{{ chapter?.name ?? 'Loading…' }}</div>

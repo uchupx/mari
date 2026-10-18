@@ -53,6 +53,7 @@ const router = createRouter({
       meta: {
         title: 'Reader',
         hideNavbar: true,
+        keepAlive: false,
       },
     },
     {
