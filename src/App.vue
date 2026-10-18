@@ -93,7 +93,11 @@ onUnmounted(() => {
   <div class="w-full bg-base-200 ">
     <div class="container mx-auto pb-10">
       <div class="w-full bg-base-200" :class="hideChrome ? 'h-screen' : 'h-[calc(100vh-4rem)]'">
-          <router-view />
+        <router-view v-slot="{ Component, route: currentRoute }">
+          <keep-alive :max="5" :exclude="['Reader']">
+            <component :is="Component" :key="currentRoute.fullPath" />
+          </keep-alive>
+        </router-view>
       </div>
     </div>
   </div>
