@@ -5,6 +5,7 @@ defineOptions({
 import { inject, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { mangaService } from '@/services';
+import { dbService } from '@/db/indexdb';
 import { Icon } from '@iconify/vue';
 import type { ChapterDataClass, MangaDataClass } from '@/types/api';
 import { useHistoryStore } from '@/stores/historyStore';
@@ -13,6 +14,7 @@ import { WorkerPool } from '@/workers/pool';
 interface PageImage {
   url: string;
   isLoaded: boolean;
+  isOffline?: boolean;
   error?: string;
 }
 
@@ -36,8 +38,9 @@ const sentinelEl = ref<HTMLElement | null>(null);
 const isLoadingNext = ref(false);
 const currentChapterIndex = ref(-1);
 const currentPageIndex = ref(-1);
+let createdObjectUrls: string[] = [];
 
-const pool = inject<WorkerPool>('workerPool')!;
+const pool = inject<WorkerPool>('workerPool');
 
 const mangaId = parseInt(route.params.mangaId as string);
 let currentPage = parseInt(route.params.chapterIndex as string);
@@ -52,17 +55,26 @@ const nextChapterIndex = (): number | null => {
 onMounted(() => {
   getChapter(mangaId, currentPage);
 
+  mangaService.getManga(mangaId)
+    .then((m) => {
+      manga = m;
+    })
+    .catch(async () => {
+      manga = await dbService.getManga(mangaId);
+    });
 
-  mangaService.getManga(mangaId).then((m) => {
-    manga = m;
-  });
-
-  mangaService.getChapter(mangaId, currentPage).then((chapter) => {
-    const pageUrls = Array.from({ length: chapter.pageCount }, (_, k) =>
-      mangaService.getPageImageUrl(mangaId, currentPage, k, false)
-    );
-    pool.dispatch('chapterDownload', { mangaId, chapterId: currentPage, pageUrls })
-  });
+  mangaService.getChapter(mangaId, currentPage)
+    .then((chapter) => {
+      if (pool) {
+        const pageUrls = Array.from({ length: chapter.pageCount }, (_, k) =>
+          mangaService.getPageImageUrl(mangaId, currentPage, k, false)
+        );
+        pool.dispatch('chapterDownload', { mangaId, chapterId: currentPage, pageUrls });
+      }
+    })
+    .catch(() => {
+      // offline, prefetch skipped
+    });
 
   loadChapterList();
 
@@ -86,14 +98,23 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (observer) observer.disconnect();
   window.removeEventListener('scroll', onScroll);
-})
+  createdObjectUrls.forEach((url) => URL.revokeObjectURL(url));
+  createdObjectUrls = [];
+});
 
 const loadChapterList = async () => {
   try {
     const chapters = await mangaService.getChapters(mangaId);
     chapterIndexes.value = chapters.map((c) => c.index);
   } catch {
-    // list is only used to resolve the next chapter; ignore failures
+    try {
+      const offlineChapters = await dbService.getChaptersForManga(mangaId);
+      if (offlineChapters.length) {
+        chapterIndexes.value = offlineChapters.map((c) => c.index);
+      }
+    } catch {
+      // list is only used to resolve the next chapter; ignore failures
+    }
   }
 };
 
@@ -110,14 +131,61 @@ const getChapter = async (mangaId: number, chapterIndex: number) => {
   isLoadingNext.value = true;
 
   try {
-    const data = await mangaService.getChapter(mangaId, chapterIndex);
+    let data: ChapterDataClass;
+    try {
+      data = await mangaService.getChapter(mangaId, chapterIndex);
+    } catch (fetchErr: any) {
+      // Fallback offline: load from IndexedDB
+      const offlineChapters = await dbService.getChaptersForManga(mangaId);
+      const matched = offlineChapters.find((c) => c.index === chapterIndex);
+      if (matched) {
+        data = matched;
+      } else {
+        throw fetchErr;
+      }
+    }
     chapterPages.value[chapterIndex].data = data;
 
-    chapterPages.value[chapterIndex].pages = Array.from({ length: data.pageCount }, (_, k) => ({
-      url: mangaService.getPageImageUrl(mangaId, chapterIndex, k, false),
-      isLoaded: false,
-      error: undefined,
-    }));
+    // Buka cache untuk mengecek apakah ada file download lokal
+    let cache: Cache | null = null;
+    if (typeof caches !== 'undefined') {
+      try {
+        cache = await caches.open('manga-pages-cache');
+      } catch (err) {
+        console.warn('[Reader] CacheStorage not accessible:', err);
+      }
+    }
+
+    const pages: PageImage[] = [];
+    for (let k = 0; k < data.pageCount; k++) {
+      const liveUrl = mangaService.getPageImageUrl(mangaId, chapterIndex, k, false);
+      let pageUrl = liveUrl;
+      let isOffline = false;
+
+      // Cek apakah ada file download di Cache Storage
+      if (cache) {
+        try {
+          const cachedResponse = await cache.match(liveUrl);
+          if (cachedResponse) {
+            const blob = await cachedResponse.blob();
+            pageUrl = URL.createObjectURL(blob);
+            createdObjectUrls.push(pageUrl);
+            isOffline = true;
+          }
+        } catch (cacheErr) {
+          console.warn('[Reader] Error checking cached page:', cacheErr);
+        }
+      }
+
+      pages.push({
+        url: pageUrl,
+        isLoaded: false,
+        isOffline,
+        error: undefined,
+      });
+    }
+
+    chapterPages.value[chapterIndex].pages = pages;
   } catch (err: any) {
     if (err?.status && err.status === 404) {
       chapterPages.value[chapterIndex].error = 'Chapter not found';
@@ -139,10 +207,27 @@ const onImgError = (chapter: ChapterPage, i: number) => {
   chapter.pages[i].error = 'Failed to load';
 };
 
-const retryImage = (chapter: ChapterPage, i: number) => {
+const retryImage = async (chapter: ChapterPage, i: number) => {
   const img = chapter.pages[i];
   img.error = undefined;
-  img.url = mangaService.getPageImageUrl(mangaId, Number(chapter.data.index), i + 1, false) + `&_r=${Date.now()}`;
+  const liveUrl = mangaService.getPageImageUrl(mangaId, Number(chapter.data.index), i, false);
+
+  if (typeof caches !== 'undefined') {
+    try {
+      const cache = await caches.open('manga-pages-cache');
+      const cachedResponse = await cache.match(liveUrl);
+      if (cachedResponse) {
+        const blob = await cachedResponse.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        createdObjectUrls.push(objectUrl);
+        img.url = objectUrl;
+        img.isOffline = true;
+        return;
+      }
+    } catch {}
+  }
+
+  img.url = liveUrl + `&_r=${Date.now()}`;
 };
 
 const onScroll = async () => {

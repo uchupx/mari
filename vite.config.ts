@@ -101,6 +101,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    allowedHosts:[ "sandbox.uchupx.work", "mari.uchupx.work"],
     host: '0.0.0.0'
   },
   define: {

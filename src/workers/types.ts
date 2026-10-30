@@ -44,9 +44,16 @@ export interface WorkerInMessage<T extends TaskName = TaskName> {
   payload: TaskPayload<T>;
 }
 
+export interface WorkerProgress {
+  loaded: number;
+  total: number;
+}
+
 export interface WorkerOutMessage<T extends TaskName = TaskName> {
   id: string;
   action: T;
+  type?: 'progress' | 'result';
+  progress?: WorkerProgress;
   result?: TaskResult<T>;
   error?: string;
 }

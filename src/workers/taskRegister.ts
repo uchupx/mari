@@ -11,7 +11,15 @@ self.onmessage = async (e: MessageEvent<WorkerInMessage>) => {
     switch (action) {
       case 'chapterDownload': {
         const p = payload as TaskRegistry['chapterDownload']['payload'];
-        result = await pageDownloadWorker(p);
+        result = await pageDownloadWorker(p, (progress) => {
+          const progressMsg: WorkerOutMessage = {
+            id,
+            action,
+            type: 'progress',
+            progress,
+          };
+          self.postMessage(progressMsg);
+        });
         break;
       }
       case 'checkUpdate': {
@@ -24,13 +32,13 @@ self.onmessage = async (e: MessageEvent<WorkerInMessage>) => {
         throw new Error(`Unknown action: ${action}`);
     }
 
-    const response: WorkerOutMessage = { id, action, result };
+    const response: WorkerOutMessage = { id, action, type: 'result', result };
     self.postMessage(response);
   } catch (err: any) {
-
     const response: WorkerOutMessage = {
       id,
       action,
+      type: 'result',
       error: err.message || 'Worker processing failed',
     };
 

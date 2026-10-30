@@ -4,12 +4,14 @@ import type {
   TaskResult,
   WorkerInMessage,
   WorkerOutMessage,
+  WorkerProgress,
 } from './types';
 
 interface InternalTask {
   id: string;
   action: TaskName;
   payload: any;
+  onProgress?: (progress: WorkerProgress) => void;
   resolve: (value: any) => void;
   reject: (reason?: any) => void;
 }
@@ -61,17 +63,22 @@ export class WorkerPool {
   }
 
   private handleMessage(managed: ManagedWorker, data: WorkerOutMessage) {
-    const { id, result, error } = data;
+    const { id, type, progress, result, error } = data;
     const task = this.activeTasks.get(id);
 
-    if (task) {
-      if (error) {
-        task.reject(new Error(error));
-      } else {
-        task.resolve(result);
-      }
-      this.activeTasks.delete(id);
+    if (!task) return;
+
+    if (type === 'progress' && progress) {
+      task.onProgress?.(progress);
+      return;
     }
+
+    if (error) {
+      task.reject(new Error(error));
+    } else {
+      task.resolve(result);
+    }
+    this.activeTasks.delete(id);
 
     managed.busy = false;
     managed.currentTaskId = null;
@@ -80,11 +87,12 @@ export class WorkerPool {
 
   public dispatch<T extends TaskName>(
     action: T,
-    payload: TaskPayload<T>
+    payload: TaskPayload<T>,
+    onProgress?: (progress: WorkerProgress) => void
   ): Promise<TaskResult<T>> {
     return new Promise<TaskResult<T>>((resolve, reject) => {
       const id = crypto.randomUUID();
-      this.queue.push({ id, action, payload, resolve, reject });
+      this.queue.push({ id, action, payload, onProgress, resolve, reject });
       this.processNext();
     });
   }
@@ -107,6 +115,10 @@ export class WorkerPool {
       payload: task.payload,
     };
     availableWorker.worker.postMessage(message);
+  }
+
+  public clearQueue() {
+    this.queue = [];
   }
 
   public terminate() {
