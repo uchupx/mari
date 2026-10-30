@@ -117,6 +117,10 @@ export class WorkerPool {
     availableWorker.worker.postMessage(message);
   }
 
+  public clearQueue() {
+    this.queue = [];
+  }
+
   public terminate() {
     for (const item of this.workers) {
       item.worker.terminate();
