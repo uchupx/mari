@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router';
-import { ref, computed, onMounted, toRaw } from 'vue';
+import { ref, computed, onMounted, toRaw, inject } from 'vue';
 import { mangaService, sourceService } from '@/services';
 import { ChapterDataClass, MangaDataClass } from '@/types/api';
 import { formatRelativeTime } from '@/utils/datetime';
 import { Icon } from '@iconify/vue';
 import { useToast } from '@/composables/useToast';
 import { useHistoryStore } from '@/stores/historyStore';
+import { useDownloadStore } from '@/stores/downloadStore';
+import type { WorkerPool } from '@/workers/pool';
 
 const toast = useToast()
 
 const route = useRoute();
 const router = useRouter();
 const historyStore = useHistoryStore();
+const downloadStore = useDownloadStore();
+const pool = inject<WorkerPool>('workerPool');
 const APIUrl = import.meta.env.SUWAYOMI_SERVER_URL
 
 const mangaId = route.params.id as string;
@@ -21,6 +25,15 @@ const chapters = ref<ChapterDataClass[]>([]);
 const isLoading = ref(true);
 const isLoadingChapters = ref(false);
 const isOnLibrary = ref(false);
+
+const isDownloading = computed(() => {
+  return manga.value ? downloadStore.isDownloadingManga(manga.value.id) : false;
+});
+
+const allDownloaded = computed(() => {
+  if (!chapters.value.length) return false;
+  return chapters.value.every((c) => downloadStore.isChapterDownloaded(c.id));
+});
 
 const lastReadChapter = computed(() => {
   return historyStore.continueReading.find((entry) => entry.mangaId === parseInt(mangaId));
@@ -60,6 +73,8 @@ onMounted(async () => {
     await historyStore.init();
   }
 
+  downloadStore.refreshDownloadedChapters(parseInt(mangaId));
+
   getManga().then(() => {
     const timestampInSeconds: number = Math.floor(Date.now() / 1000);
     const shouldOnlineFetch = timestampInSeconds - (manga.value?.lastFetchedAt ?? 0) > 60;
@@ -69,6 +84,35 @@ onMounted(async () => {
 
   isOnLibrary.value = await mangaService.isOnLibrary(parseInt(mangaId));
 });
+
+const handleDownloadAll = async () => {
+  if (!manga.value || !chapters.value.length) {
+    toast.error('No chapters available to download');
+    return;
+  }
+  if (!pool) {
+    toast.error('Worker pool not ready');
+    return;
+  }
+
+  toast.info(`Starting download for ${chapters.value.length} chapters...`);
+  try {
+    await downloadStore.startDownloadAll(manga.value, chapters.value, pool);
+    if (downloadStore.error) {
+      toast.error(`Download failed: ${downloadStore.error}`);
+    } else if (downloadStore.completedChapters > 0 && downloadStore.failedChapters === 0) {
+      toast.success(`Successfully downloaded ${downloadStore.completedChapters} chapters!`);
+    } else if (downloadStore.completedChapters > 0) {
+      toast.warning(
+        `Downloaded ${downloadStore.completedChapters} chapters, ${downloadStore.failedChapters} failed.`
+      );
+    } else if (downloadStore.failedChapters > 0) {
+      toast.error(`Failed to download ${downloadStore.failedChapters} chapters.`);
+    }
+  } catch (err: any) {
+    toast.error(`Download failed: ${err?.message || err}`);
+  }
+};
 
 const getChapters = (shouldOnlineFetch: boolean = false) => {
   isLoading.value = true;
@@ -172,11 +216,55 @@ const removeFromLibrary = async () => {
                 </button>
             </template>
 
+            <!-- Download Section -->
+            <div v-if="isDownloading" class="w-full bg-base-200 p-3 rounded-xl space-y-2 border border-primary/20">
+                <div class="flex items-center justify-between text-sm">
+                    <span class="font-medium flex items-center gap-2">
+                        <span class="loading loading-spinner loading-xs text-primary"></span>
+                        Downloading Images...
+                    </span>
+                    <span class="tabular-nums font-semibold text-primary text-xs">
+                        <template v-if="downloadStore.totalImages > 0">
+                            {{ downloadStore.downloadedImages }} / {{ downloadStore.totalImages }} img
+                        </template>
+                        <template v-else>
+                            Ch. {{ downloadStore.completedChapters }} / {{ downloadStore.totalChapters }}
+                        </template>
+                    </span>
+                </div>
+                <progress
+                    class="progress progress-primary w-full"
+                    :value="downloadStore.totalImages > 0 ? downloadStore.downloadedImages : downloadStore.completedChapters"
+                    :max="downloadStore.totalImages > 0 ? downloadStore.totalImages : (downloadStore.totalChapters || 1)"
+                ></progress>
+                <div class="flex items-center justify-between text-xs opacity-70">
+                    <span class="truncate max-w-[220px]">
+                        <template v-if="downloadStore.currentChapterIndex > 0">
+                            Ch. {{ downloadStore.currentChapterIndex }}/{{ downloadStore.totalChapters }}:
+                        </template>
+                        {{ downloadStore.currentChapterName }}
+                        <template v-if="downloadStore.currentChapterTotalPages > 0">
+                            ({{ downloadStore.currentChapterPageIndex }}/{{ downloadStore.currentChapterTotalPages }}p)
+                        </template>
+                    </span>
+                    <span class="font-semibold">{{ downloadStore.progressPercent }}%</span>
+                </div>
+                <button
+                    class="btn btn-error btn-outline btn-xs w-full mt-1"
+                    @click="downloadStore.cancelDownload"
+                >
+                    <Icon icon="material-symbols:cancel-outline" class="size-4" />
+                    Cancel Download
+                </button>
+            </div>
             <button
+                v-else
                 class="btn btn-primary w-full"
+                :disabled="!chapters.length"
+                @click="handleDownloadAll"
             >
                 <Icon icon="akar-icons:cloud-download" class="size-[1.2em]" />
-                Download
+                {{ allDownloaded ? 'Re-Download All' : 'Download All' }}
             </button>
             <button
                 class="btn btn-primary w-full"
@@ -207,8 +295,17 @@ const removeFromLibrary = async () => {
               @keydown.enter="router.push({ name: 'reader', params: { mangaId: mangaId, chapterIndex: chapter.index } })"
             >
               <div class="text-4xl font-thin opacity-30 tabular-nums">{{ chapter.chapterNumber }}</div>
-              <div class="min-w-0">
-                <div class="truncate">{{ chapter.name }}</div>
+              <div class="min-w-0 flex-1">
+                <div class="truncate flex items-center gap-1.5">
+                  <span>{{ chapter.name }}</span>
+                  <span
+                    v-if="downloadStore.isChapterDownloaded(chapter.id)"
+                    class="badge badge-xs badge-success gap-0.5 text-[10px]"
+                    title="Downloaded"
+                  >
+                    <Icon icon="material-symbols:check" class="size-3" />
+                  </span>
+                </div>
                 <div class="text-xs uppercase font-semibold opacity-60">{{ formatRelativeTime(chapter.uploadDate) }}</div>
               </div>
 

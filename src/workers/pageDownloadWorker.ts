@@ -1,37 +1,73 @@
-import type { ChapterDownloadPayload, ChapterDownloadResult } from "./types";
+import type { ChapterDownloadPayload, ChapterDownloadResult, WorkerProgress } from "./types";
 
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error('FileReader failed'));
-    reader.readAsDataURL(blob);
-  });
-}
+export type PageDownloadProgressCallback = (progress: WorkerProgress) => void;
 
-export async function pageDownloadWorker(payload: ChapterDownloadPayload): Promise<ChapterDownloadResult> {
+export async function pageDownloadWorker(
+  payload: ChapterDownloadPayload,
+  onProgress?: PageDownloadProgressCallback
+): Promise<ChapterDownloadResult> {
   const { mangaId, chapterId, pageUrls } = payload;
 
-  try {
-    const pageResults: Record<number, string> = {};
+  if (!pageUrls || pageUrls.length === 0) {
+    return {
+      status: 'error',
+      error: 'Chapter has no pages (pageUrls is empty)',
+      mangaId,
+      chapterId,
+    };
+  }
 
-    for (let i = 0; i < pageUrls.length; i++) {
-      const pageResponse = await fetch(pageUrls[i]);
-      if (!pageResponse.ok) {
-        throw new Error(`HTTP ${pageResponse.status} on page ${i}`);
+  try {
+    let cache: Cache | null = null;
+    if (typeof caches !== 'undefined') {
+      try {
+        cache = await caches.open('manga-pages-cache');
+      } catch (e) {
+        console.warn('[pageDownloadWorker] CacheStorage not accessible:', e);
       }
-      const blob = await pageResponse.blob();
-      pageResults[i] = await blobToDataUrl(blob);
     }
+
+    console.log(`[pageDownloadWorker] Starting download: manga ${mangaId}, chapter ${chapterId}, ${pageUrls.length} pages`);
+
+    let loadedCount = 0;
+    const totalCount = pageUrls.length;
+
+    // Process requests in small concurrency batches to optimize throughput
+    const CONCURRENCY = 4;
+    for (let i = 0; i < pageUrls.length; i += CONCURRENCY) {
+      const batch = pageUrls.slice(i, i + CONCURRENCY);
+      await Promise.all(
+        batch.map(async (url, idx) => {
+          const pageIndex = i + idx;
+          const pageResponse = await fetch(url);
+          if (!pageResponse.ok) {
+            throw new Error(`HTTP ${pageResponse.status} on page ${pageIndex} (${url})`);
+          }
+          if (cache) {
+            try {
+              await cache.put(url, pageResponse.clone());
+            } catch (err) {
+              console.warn('[pageDownloadWorker] Failed to cache page:', url, err);
+            }
+          }
+          loadedCount++;
+          if (onProgress) {
+            onProgress({ loaded: loadedCount, total: totalCount });
+          }
+        })
+      );
+    }
+
+    console.log(`[pageDownloadWorker] Completed download: manga ${mangaId}, chapter ${chapterId}`);
 
     return {
       status: 'success',
-      data: pageResults,
       mangaId,
       chapterId,
     };
 
   } catch (error) {
+    console.error(`[pageDownloadWorker] Failed chapter ${chapterId}:`, error);
     return {
       status: 'error',
       error: error instanceof Error ? error.message : String(error),
